@@ -4,13 +4,14 @@
 .vs/
 .vscode/
 .venv/
+.libs/
 venv/
 **.coverage
 **/.coverage_report_html/
 resources/
 localdata/
 dist/
-mespe.egg-info/
+signals.egg-info/
 **/__pycache__
 **.pyc
 **.txt
