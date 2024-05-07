@@ -371,7 +371,7 @@ class Signal(TrackedInstances):
 
         # build the list of handler functions for passing arguments
         for handler in slots:
-            register_emission(
+            registerEmission(
                 SignalTask(
                     priority=self.priority,
                     func=handler,
@@ -454,7 +454,6 @@ class Signal(TrackedInstances):
                 del self._weak_methods[name]
                 
 
-
 @dataclass(order=True)
 class SignalTask:
     priority: int
@@ -465,7 +464,7 @@ class SignalTask:
 
 _processor: PriorityThreadPoolExecutor = None
 
-def get_signal_processor(thread_ct: int = 10):
+def getSignalProcessor(thread_ct: int = 10):
     """
     Returns the signal processor thread pool, building it if necessary.
     """
@@ -475,14 +474,14 @@ def get_signal_processor(thread_ct: int = 10):
     return _processor
 
 
-def register_emission(task: SignalTask):
+def registerEmission(task: SignalTask):
     """
     Submit a work task to the thread pool executor.
     """
-    future = get_signal_processor().submit(
+    future = getSignalProcessor().submit(
         task.func, *task.args, priority=task.priority
     )
-    future.add_done_callback(on_future_complete)
+    future.add_done_callback(onFutureComplete)
 
 
 def join():
@@ -494,7 +493,7 @@ def join():
     _processor._work_queue.join()
 
 
-def on_future_complete(fut: Future):
+def onFutureComplete(fut: Future):
     """
     Default completion callback for all signal processor future objects.
     Provides error handling if an exception is thrown in the future object.

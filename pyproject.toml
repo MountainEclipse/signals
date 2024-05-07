@@ -1,6 +1,6 @@
 [project]
 name = "signals"
-version = "0.0.1"
+version = "0.0.2"
 authors = [{name="MountainEclilpse", email="none-provided@none-provided.com"}]
 description = "Signal-and-slot system for asynchronous event processing"
 readme = "README.md"

@@ -26,6 +26,6 @@ del hard_dependencies, dependency, missing_dependencies
 __version__ = (0, 0, 1)
 
 # All members that can be imported
-__all__ = ["Signal", "SignalPriority", "join", "shutdown"]
+__all__ = ["Signal", "SignalPriority", "join", "shutdown", "SignalTask", "registerEmission", "getSignalProcessor"]
 
-from ._signals import Signal, SignalPriority, join, shutdown
+from ._signals import Signal, SignalPriority, join, shutdown, getSignalProcessor, registerEmission, SignalTask
