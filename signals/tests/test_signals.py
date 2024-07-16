@@ -1,19 +1,23 @@
 import unittest
-import _signals as signals
+from .. import _signals as signals
 
 
 test_results = None
+
 
 def func(v1, v2):
     global test_results
     test_results["func"] = (v1, v2)
 
+
 def func_w_typing(v1: int, v2: str):
     global test_results
     test_results["func_w_typing"] = (v1, v2)
 
+
 def func_error(v1: str, v2: str, v3: str):
     return 'func_error', v1, v2, v3
+
 
 class TestFuncs:
 
@@ -24,6 +28,7 @@ class TestFuncs:
     def method_w_typing(self, v1: int, v2: str):
         global test_results
         test_results["method_w_typing"] = (v1, v2)
+
 
 class TestSignal(unittest.TestCase):
 
@@ -110,8 +115,10 @@ class TestSignal(unittest.TestCase):
             pass
 
         cmp = (int, str)  # should return 0 for (int, str) 2 for (object, object)
-        cmp2 = (str, str)  # should return -1 for (int, str) and 2 for (object, object)
-        cmp3 = (ChildInt, ChildStr)  # should return 2 for (int, str) and 4 for (object, object)
+        # should return -1 for (int, str) and 2 for (object, object)
+        cmp2 = (str, str)
+        # should return 2 for (int, str) and 4 for (object, object)
+        cmp3 = (ChildInt, ChildStr)
         cmp4 = (int, str, str)  # should return -2 for all
 
         self.assertEqual(self.signal._similarity(cmp)[0][1], 0)
@@ -126,7 +133,8 @@ class TestSignal(unittest.TestCase):
         self.assertEqual(self.signal._similarity(cmp4)[0][1], -2)
         self.assertEqual(self.signal._similarity(cmp4)[1][1], -2)
 
-        self.assertRaises(TypeError, self.signal._similarity, [int, object, str])
+        self.assertRaises(TypeError, self.signal._similarity,
+                          [int, object, str])
 
     # def test_weakref_cleanup(self):
     #     """

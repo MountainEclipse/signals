@@ -9,8 +9,10 @@ Created on: 7/4/2021 at 7:51 AM.
 @author: MountainEclipse
 
 Revision 1/13/2024 to add signal processor to file, reducing dependency on other files
+Revision 7/15/2024 to add bound method decoration ability for SignalFactory class
 
 """
+import functools
 import inspect
 from typing import Callable, Iterable
 from weakref import WeakSet, WeakMethod, finalize
@@ -29,11 +31,6 @@ import atexit
 import weakref
 from concurrent.futures.thread import ThreadPoolExecutor, _base, _WorkItem
 
-from baseclass import TrackedInstances, EnumDict
-
-
-__all__ = ['Signal', 'SignalPriority', 'join', 'shutdown']
-
 
 """
 Code below this is derived from:
@@ -46,6 +43,7 @@ Implementation of a ThreadPoolExecutor with PriorityQueue to simplify
 ########################################################################################################################
 #                                                Global variables                                                      #
 ########################################################################################################################
+
 
 @dataclass(order=True)
 class PriorityWorkItem:
@@ -75,6 +73,7 @@ def python_exit():
 
 # change default cleanup
 
+
 atexit.register(python_exit)
 
 
@@ -96,7 +95,7 @@ def _worker(executor_reference, work_queue):
             work_item = work_queue.get(block=True)
             if work_item is NULL_PRIORITY_ITEM:
                 break
-            if (isinstance(work_item, PriorityWorkItem) 
+            if (isinstance(work_item, PriorityWorkItem)
                     and work_item.priority != sys.maxsize):
                 work_item = work_item.task
                 try:
@@ -154,7 +153,8 @@ class PriorityThreadPoolExecutor(ThreadPoolExecutor):
         """
         with self._shutdown_lock:
             if self._shutdown:
-                raise RuntimeError('cannot schedule new futures after shutdown')
+                raise RuntimeError(
+                    'cannot schedule new futures after shutdown')
 
             priority = kwargs.pop('priority', random.randint(0, sys.maxsize-1))
 
@@ -162,7 +162,7 @@ class PriorityThreadPoolExecutor(ThreadPoolExecutor):
             w = _WorkItem(f, fn, args, kwargs)
 
             self._work_queue.put(PriorityWorkItem(
-                priority=priority, 
+                priority=priority,
                 task=w
             ))
             self._adjust_thread_count()
@@ -212,20 +212,21 @@ Self-produced code below this point
 #                                          Signal Processor Code                                       #
 #######################################################################################################################
 
-class SignalPriority(EnumDict):
+
+class SignalPriority:
     IMMEDIATE = 1
     HIGH = 2
     MODERATE = 3
     NORMAL = 4
     LOW = 5
-    NONE = 6   
+    NONE = 6
 
 
-class Signal(TrackedInstances):
+class Signal:
     """
     Signal class for event handling. Does not keep persistent any slots attached,
     so if other references to slots are destroyed, the slot will drop off the signal.
-    
+
     :property _slots_structs: dict
         Contains all typedefs and associated slots under that typedef.
             Structured as: 
@@ -236,7 +237,7 @@ class Signal(TrackedInstances):
     """
     _slots_structs: dict[tuple, WeakSet]
 
-    def __init__(self, *typedefs, 
+    def __init__(self, *typedefs,
                  priority: int = SignalPriority.NORMAL):
         """
         Instantiate the class.
@@ -256,7 +257,8 @@ class Signal(TrackedInstances):
         for typedef in typedefs:
             if isinstance(typedef, Iterable):
                 self._slots_structs[tuple(typedef)] = WeakSet()
-                self._slots_structs[tuple([object for _ in typedef])] = WeakSet()
+                self._slots_structs[tuple(
+                    [object for _ in typedef])] = WeakSet()
                 continue
             raise TypeError(
                 "Signal emission data type definitions must be Iterable, not " +
@@ -286,7 +288,7 @@ class Signal(TrackedInstances):
         """
         # build comparison table for the given typedef
         similarity = self._similarity(typedef)
-        
+
         rtn = []
         for v in similarity:
             if v[1] < 0:  # an error / non-match found
@@ -294,7 +296,8 @@ class Signal(TrackedInstances):
             elif v[1] > tolerance:
                 # tolerance is too high for this result
                 continue
-            rtn += self._slots_structs[v[0]].copy()  # append a copy to not screw with list
+            # append a copy to not screw with list
+            rtn += self._slots_structs[v[0]].copy()
 
         # get references to methods themselves, not just weakMethods
         for i in range(len(rtn)):
@@ -305,7 +308,7 @@ class Signal(TrackedInstances):
     def connect(self, slot: Callable) -> None:
         """
         Connect a slot to this Signal according to the slot's argument type annotations. 
-        
+
         Slot will be called when Signal emits data that fits its argument
         type definitions according to either the @Slot(*types) decorator or
         type-hinting / annotations in the slot function definition.
@@ -336,7 +339,7 @@ class Signal(TrackedInstances):
             self._slots_structs[typedef].add(wm)
         else:
             self._slots_structs[typedef].add(slot)
-        
+
         # clear the similarity cache to force an update on next call
         self._similarity.cache_clear()
 
@@ -355,7 +358,7 @@ class Signal(TrackedInstances):
         for seq in self._slots_structs.values():
             if slot in seq:
                 seq.remove(slot)
-        
+
         # clear the similarity cache to force an update on next call
         self._similarity.cache_clear()
 
@@ -426,7 +429,7 @@ class Signal(TrackedInstances):
                     idx = inspect.getmro(s[0]).index(s[1])
                     diff += idx
                 except ValueError:
-                    # at least one argument is not in the MRO of the current typedef 
+                    # at least one argument is not in the MRO of the current typedef
                     rtn.append((cmp[1], -1))
                     break
             else:
@@ -442,7 +445,8 @@ class Signal(TrackedInstances):
         if no annotation exists.
         """
         params = inspect.signature(slot).parameters
-        types = (v.annotation if v.annotation is not inspect._empty else object for v in params.values())
+        types = (
+            v.annotation if v.annotation is not inspect._empty else object for v in params.values())
         return tuple(types)
 
     def _bound_method_deleted(self, name: str):
@@ -452,7 +456,7 @@ class Signal(TrackedInstances):
             if self._weak_methods.get(name, None) in self._slots_structs[key]:
                 self._slots_structs[key].remove(self._weak_methods[name])
                 del self._weak_methods[name]
-                
+
 
 @dataclass(order=True)
 class SignalTask:
@@ -464,13 +468,15 @@ class SignalTask:
 
 _processor: PriorityThreadPoolExecutor = None
 
+
 def getSignalProcessor(thread_ct: int = 10):
     """
     Returns the signal processor thread pool, building it if necessary.
     """
     global _processor
     if _processor is None:
-        _processor = PriorityThreadPoolExecutor(max_workers=thread_ct, thread_name_prefix='SignalProcessor')
+        _processor = PriorityThreadPoolExecutor(
+            max_workers=thread_ct, thread_name_prefix='SignalProcessor')
     return _processor
 
 
@@ -534,3 +540,86 @@ def shutdown():
         return
     _processor.shutdown(wait=True)
     _processor = None
+
+
+# ----------------------------------------------------------------------------------
+#                   Signal Factory Helper class and decorator function
+#                       07/15/2024 By MountainEclipse
+# ----------------------------------------------------------------------------------
+
+
+class SignalFactory:
+    """
+    Decorator class to be added to functions, bound methods, etc.
+
+    Defines Signals that fire whan the decorated function is called, when it
+    completes, and if/when any error is raised.
+
+    onCall emits two arguments: <function: Callable>, <arguments: tuple>
+    onError emits two arguments: <function: Callable>, <error: Exception>
+    onComplete emits two arguments: <function: Callable>, <result: object>
+    """
+
+    onCall: Signal
+    onError: Signal
+    onComplete: Signal
+
+    def __init__(self, onCall: bool = True, onError: bool = True, onComplete: bool = True):
+        self.__onCall = onCall
+        self.__onError = onError
+        self.__onComplete = onComplete
+
+    def __call__(self, func) -> 'SignalFactory':
+        sig = inspect.signature(func)
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            bound_args = sig.bind(*args, **kwargs)
+            ordered = tuple(bound_args.arguments[param.name]
+                            for param in sig.parameters.values())
+
+            # emit the onCall signal with arguments passed
+            if hasattr(wrapper, "onCall"):
+                wrapper.onCall.emit(func, ordered)
+            try:
+                result = func(*args, **kwargs)
+            except Exception as e:
+                # emit the onError signal with exception message
+                if hasattr(wrapper, "onError"):
+                    wrapper.onError.emit(func, e)
+                raise e
+            else:
+                # emit the onCompleted signal with return value
+                if hasattr(wrapper, "onComplete"):
+                    wrapper.onComplete.emit(func, result)
+                return result
+
+        self.__wrapped__ = wrapper
+
+        # create necessary signals. Runs once at time of decoration
+
+        # get the annotation for the target function's return value
+        rtn_type = (Callable,
+                    (sig.return_annotation
+                     if sig.return_annotation is not inspect.Signature.empty
+                     else object))
+
+        if self.__onCall:
+            # signal data types are (calling_func, *arg_t)
+            wrapper.onCall = Signal((Callable, Iterable))
+        if self.__onError:
+            # signal data types are (calling_func, Exception)
+            wrapper.onError = Signal((Callable, Exception))
+        if self.__onComplete:
+            # signal data types are (calling_func, *arg_t)
+            wrapper.onComplete = Signal(rtn_type)
+
+        return wrapper
+
+    def __get__(self, instance, owner) -> 'SignalFactory':
+        if instance is None:
+            # It's being accessed from the class (for class methods)
+            return self
+        else:
+            # It's being accessed from an instance (for bound methods)
+            return self.__call__(self.__wrapped__)

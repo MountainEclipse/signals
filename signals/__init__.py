@@ -6,7 +6,10 @@ signals == Signal-Slot Event Processing Library
 """
 
 # Inform users of any missing hard dependencies
-hard_dependencies = ['baseclass', 'typing']
+from ._signals import (Signal, SignalPriority, join, shutdown, getSignalProcessor,
+                       registerEmission, SignalTask, SignalFactory)
+
+hard_dependencies = ['typing']
 missing_dependencies = []  # dependency strings
 
 for dependency in hard_dependencies:
@@ -23,9 +26,8 @@ if missing_dependencies:
 del hard_dependencies, dependency, missing_dependencies
 
 # library version
-__version__ = (0, 0, 1)
+__version__ = (0, 0, 3)
 
 # All members that can be imported
-__all__ = ["Signal", "SignalPriority", "join", "shutdown", "SignalTask", "registerEmission", "getSignalProcessor"]
-
-from ._signals import Signal, SignalPriority, join, shutdown, getSignalProcessor, registerEmission, SignalTask
+__all__ = ["Signal", "SignalPriority", "join", "shutdown",
+           "SignalTask", "registerEmission", "getSignalProcessor"]
