@@ -575,6 +575,7 @@ class SignalFactory:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             bound_args = sig.bind(*args, **kwargs)
+            bound_args.apply_defaults()
             ordered = tuple(bound_args.arguments[param.name]
                             for param in sig.parameters.values())
 
